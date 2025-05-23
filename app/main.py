@@ -1,11 +1,13 @@
 from fastapi import FastAPI, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
+from typing import List
+from sqlalchemy import func     
 from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import Base, engine, SessionLocal
 from fastapi.templating import Jinja2Templates
-from datetime import datetime
+from datetime import date
 
 Base.metadata.create_all(bind=engine)
 
@@ -40,6 +42,8 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     db.refresh(message)
     return message
 
-@app.get("/messages/today/")
-def latest_message(db: Session = Depends(get_db)):
-    return db.query(models.Message).order_by(models.Message.created_at.desc()).filter(models.Message.created_at  >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0))
+@app.get("/messages/today/", response_model=List[schemas.MessageOut])
+def messages_today(db: Session = Depends(get_db)):
+    today = date.today()
+    messages = db.query(models.Message).filter(func.date(models.Message.created_at) == today).all()
+    return messages
