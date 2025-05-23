@@ -40,6 +40,6 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     db.refresh(message)
     return message
 
-@app.get("/messages/today/", response_model=schemas.MessageOut)
+@app.get("/messages/today/")
 def latest_message(db: Session = Depends(get_db)):
     return db.query(models.Message).order_by(models.Message.created_at.desc()).filter(models.Message.created_at  >= datetime.now().replace(hour=0, minute=0, second=0, microsecond=0))
