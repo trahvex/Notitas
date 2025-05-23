@@ -42,8 +42,9 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     db.refresh(message)
     return message
 
-@app.get("/messages/today/", response_model=List[schemas.MessageOut])
+@app.get("/messages/today/", response_model=dict)
 def messages_today(db: Session = Depends(get_db)):
     today = date.today()
     messages = db.query(models.Message).filter(func.date(models.Message.created_at) == today).all()
-    return messages
+    notes = [schemas.MessageOut.model_validate(m) for m in messages]
+    return {"notes": notes}
