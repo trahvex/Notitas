@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Leave a Note</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📝 Dejame un mensaje</h1>
+        <form method="post" action="/messages/submit">
+            <label for="author">Tu nombre</label>
+            <input type="text" id="author" name="author" required>
+
+            <label for="text">Mensaje</label>
+            <textarea id="text" name="text" required></textarea>
+
+            <button type="submit">Enviar</button>
+        </form>
+    </div>
+</body>
+</html>
