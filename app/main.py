@@ -23,7 +23,7 @@ def get_db():
     finally:
         db.close()
 
-@app.get("/messages/", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse("form.html", {"request": request})
 
@@ -32,7 +32,7 @@ def submit_form(text: str = Form(...), author: str = Form(...), db: Session = De
     message = models.Message(text=text, author=author)
     db.add(message)
     db.commit()
-    return RedirectResponse("/messages/", status_code=303)
+    return RedirectResponse("/", status_code=303)
 
 @app.post("/messages/create", response_model=schemas.MessageOut)
 def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
