@@ -7,7 +7,9 @@ from sqlalchemy.orm import Session
 from . import models, schemas
 from .database import Base, engine, SessionLocal
 from fastapi.templating import Jinja2Templates
-from datetime import date
+from datetime import date, datetime
+import random
+import os
 
 Base.metadata.create_all(bind=engine)
 
@@ -46,5 +48,33 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
 def messages_today(db: Session = Depends(get_db)):
     today = date.today()
     messages = db.query(models.Message).filter(func.date(models.Message.created_at) == today).all()
+    
+    if not messages:
+        refranes_path = "app/static/refranes.txt"
+        if os.path.exists(refranes_path):
+            with open(refranes_path, "r", encoding="utf-8") as f:
+                refranes = [line.strip() for line in f if line.strip()]
+            if refranes:
+                # Use the date string as seed for daily consistency
+                random.seed(today.strftime("%Y%m%d"))
+                refran = random.choice(refranes)
+                random.seed(None) # Reset seed
+                return {
+                    "notes": [
+                        {
+                            "id": 0,
+                            "text": refran,
+                            "author": "Refranero popular",
+                            "created_at": datetime.now()
+                        }
+                    ]
+                }
+    
+    notes = [schemas.MessageOut.model_validate(m) for m in messages]
+    return {"notes": notes}
+
+@app.get("/messages/all/", response_model=dict)
+def get_all_messages(db: Session = Depends(get_db)):
+    messages = db.query(models.Message).all()
     notes = [schemas.MessageOut.model_validate(m) for m in messages]
     return {"notes": notes}
