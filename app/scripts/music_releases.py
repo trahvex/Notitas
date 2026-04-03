@@ -94,8 +94,7 @@ def _mb_get(path: str, params: dict) -> Optional[dict]:
     Reintenta automáticamente ante códigos 429 (rate-limit) y 503
     con backoff exponencial hasta MAX_RETRIES veces.
     """
-    # urllib.parse.urlencode no soporta listas por defecto; usamos doseq=True
-    qs = urllib.parse.urlencode(params, doseq=True)
+    qs = urllib.parse.urlencode(params)
     url = f"{MUSICBRAINZ_BASE}/{path}?{qs}"
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 
@@ -163,20 +162,22 @@ def get_artist_mbid(artist_name: str) -> Optional[str]:
     return None
 
 
+ALLOWED_TYPES: set[str] = {"Album", "Single", "EP"}
+
+
 def get_latest_release(mbid: str, artist_name: str) -> Optional[dict]:
     """
     Obtiene el release-group más reciente de un artista dado su MBID.
 
-    Filtra por los tipos Album, Single y EP usando parámetros separados
-    (la barra | no es sintaxis válida en la API de MusicBrainz).
+    Nota: el parámetro 'type' de MusicBrainz no se puede pasar con múltiples
+    valores vía urlencode sin que el '|' quede codificado como '%7C' (HTTP 400).
+    Se obtienen todos los release-groups y se filtra por tipo en Python.
     Devuelve dict con: title, date, type, mbid o None si no hay datos.
     """
-    # BUGFIX: la API acepta el parámetro "type" múltiples veces, no separado por |
     data = _mb_get(
         "release-group",
         {
             "artist": mbid,
-            "type": ["album", "single", "ep"],   # doseq=True en urlencode lo expande
             "limit": 100,
             "fmt": "json",
         },
@@ -187,10 +188,11 @@ def get_latest_release(mbid: str, artist_name: str) -> Optional[dict]:
         return None
 
     groups = data.get("release-groups", [])
-    # Filtrar los que tienen fecha y ordenar desc
+    # Filtrar por tipo (Album / Single / EP) y que tengan fecha
     dated = [
         g for g in groups
-        if g.get("first-release-date", "").strip()
+        if g.get("primary-type", "") in ALLOWED_TYPES
+        and g.get("first-release-date", "").strip()
     ]
     if not dated:
         return None
