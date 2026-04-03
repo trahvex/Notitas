@@ -28,7 +28,7 @@ def get_db():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("form.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="form.html")
 
 @app.post("/messages/submit")
 def submit_form(text: str = Form(...), author: str = Form(...), db: Session = Depends(get_db)):
@@ -85,7 +85,7 @@ def messages_today(db: Session = Depends(get_db)):
     secondary_note = notes_data[1] if len(notes_data) > 1 else {"text": "", "author": ""}
 
     return {
-        "notes": notes, 
+        "notes": notes_data, 
         "merge_variables": {
             "date": today.strftime("%d/%m/%Y"),
             "has_notes": len(notes_data) > 0,
