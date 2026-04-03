@@ -109,7 +109,7 @@ def get_all_messages(db: Session = Depends(get_db)):
 # Endpoint: Lanzamientos musicales de la última semana
 # ---------------------------------------------------------------------------
 
-MUSIC_RELEASES_PATH = "app/static/music_releases.json"
+MUSIC_RELEASES_PATH = "app/static/musica/music_releases.json"
 
 @app.get("/music/releases/", response_model=dict)
 def music_releases():

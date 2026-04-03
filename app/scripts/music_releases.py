@@ -31,7 +31,7 @@ import urllib.error
 # Configuración
 # ---------------------------------------------------------------------------
 MIN_TRACKS: int = 5
-OUTPUT_PATH: Path = Path("app/static/music/music_releases.json")
+OUTPUT_PATH: Path = Path("app/static/musica/music_releases.json")
 MUSICBRAINZ_BASE: str = "https://musicbrainz.org/ws/2"
 USER_AGENT: str = "trmnl-music-widget/1.0 (https://github.com/nebur)"
 REQUEST_DELAY: float = 1.1  # MusicBrainz permite 1 req/s
