@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Depends, Request, Form, UploadFile, File, Header, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
 from sqlalchemy import func     
@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 API_TOKEN = os.getenv("TRMNL_API_TOKEN")
+IMAGE_TOKEN = os.getenv("IMAGE_API_TOKEN", API_TOKEN)
+IMAGE_DIR = "data/images"
 
 def verify_token(authorization: str = Header(None), token: str = None):
     req_token = None
@@ -28,12 +30,23 @@ def verify_token(authorization: str = Header(None), token: str = None):
     if not API_TOKEN or req_token != API_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+def verify_image_token(token: str = None):
+    if not IMAGE_TOKEN or token != IMAGE_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
 templates = Jinja2Templates(directory="app/templates")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+@app.get("/messages/image/{filename}")
+def get_message_image(filename: str, _=Depends(verify_image_token)):
+    file_path = os.path.join(IMAGE_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Image not found")
+    return FileResponse(file_path)
 
 def get_db():
     db = SessionLocal()
@@ -51,11 +64,11 @@ def submit_form(text: str = Form(...), author: str = Form(...), image: UploadFil
     image_path = None
     if image and image.filename:
         filename = f"{uuid.uuid4()}_{image.filename}"
-        os.makedirs("app/static/images", exist_ok=True)
-        filepath = os.path.join("app/static/images", filename)
+        os.makedirs(IMAGE_DIR, exist_ok=True)
+        filepath = os.path.join(IMAGE_DIR, filename)
         with open(filepath, "wb") as f:
             f.write(image.file.read())
-        image_path = f"/static/images/{filename}"
+        image_path = filename # Guardar solo nombre para el endpoint relativo
 
     message = models.Message(text=text, author=author, image_path=image_path)
     db.add(message)
@@ -71,7 +84,7 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     return message
 
 @app.get("/messages/today/", response_model=dict)
-def messages_today(db: Session = Depends(get_db), _=Depends(verify_token)):
+def messages_today(request: Request, db: Session = Depends(get_db), _=Depends(verify_token)):
     today = date.today()
     messages = db.query(models.Message).filter(func.date(models.Message.created_at) == today).all()
     
@@ -106,14 +119,9 @@ def messages_today(db: Session = Depends(get_db), _=Depends(verify_token)):
             note_dict["created_at"] = note_dict["created_at"].strftime('%Y-%m-%d %H:%M')
             
         if note_dict.get("image_path"):
-            filepath = "app" + note_dict["image_path"] # /static/...
-            if os.path.exists(filepath):
-                with open(filepath, "rb") as img_file:
-                    encoded_string = base64.b64encode(img_file.read()).decode()
-                    mime_type, _ = mimetypes.guess_type(filepath)
-                    if not mime_type:
-                        mime_type = "image/jpeg"
-                    note_dict["image_base64"] = f"data:{mime_type};base64,{encoded_string}"
+            base_url = str(request.base_url).rstrip("/")
+            filename = note_dict["image_path"].split("/")[-1]
+            note_dict["image_url"] = f"{base_url}/messages/image/{filename}?token={IMAGE_TOKEN}"
 
         notes_data.append(note_dict)
     
@@ -129,7 +137,7 @@ def messages_today(db: Session = Depends(get_db), _=Depends(verify_token)):
             "notes": notes_data,
             "primary_text": primary_note.get("text", ""),
             "primary_author": primary_note.get("author", ""),
-            "primary_image_base64": primary_note.get("image_base64", ""),
+            "primary_image_url": primary_note.get("image_url", ""),
             "secondary_text": secondary_note.get("text", ""),
             "secondary_author": secondary_note.get("author", "")
         }
