@@ -189,10 +189,12 @@ def get_latest_release(mbid: str, artist_name: str) -> Optional[dict]:
 
     groups = data.get("release-groups", [])
     # Filtrar por tipo (Album / Single / EP) y que tengan fecha
+    now_str = datetime.now(timezone.utc).date().isoformat()
     dated = [
         g for g in groups
         if g.get("primary-type", "") in ALLOWED_TYPES
         and g.get("first-release-date", "").strip()
+        and g.get("first-release-date", "") <= now_str
     ]
     if not dated:
         return None

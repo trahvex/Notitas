@@ -151,7 +151,7 @@ def music_releases():
         except (ValueError, TypeError):
             continue
 
-        if rel_dt >= one_week_ago:
+        if one_week_ago <= rel_dt <= now:
             recent.append({
                 "artist": release.get("artist", ""),
                 "title": release.get("title", ""),
