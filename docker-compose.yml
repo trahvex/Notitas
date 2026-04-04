@@ -5,10 +5,9 @@ services:
       - "8002:8000"
     environment:
       - DATABASE_URL=sqlite:///./data/notitas.db
+      - TRMNL_API_TOKEN=${TRMNL_API_TOKEN}
     volumes:
       - .:/app
-      - app_data:/app/data
+      - ./data:/app/data
     restart: always
 
-volumes:
-  app_data:

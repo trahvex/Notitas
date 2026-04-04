@@ -8,4 +8,5 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     text = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.now(tz=ZoneInfo("Europe/Madrid")))
-    author = Column(Text, nullable = False)
+    author = Column(Text, nullable=False)
+    image_path = Column(Text, nullable=True)

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, Request, Form
+from fastapi import FastAPI, Depends, Request, Form, UploadFile, File, Header, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
@@ -11,6 +11,22 @@ from datetime import date, datetime, timezone, timedelta
 import random
 import os
 import json
+import base64
+import mimetypes
+import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
+API_TOKEN = os.getenv("TRMNL_API_TOKEN")
+
+def verify_token(authorization: str = Header(None), token: str = None):
+    req_token = None
+    if authorization and authorization.startswith("Bearer "):
+        req_token = authorization.split(" ")[1]
+    elif token:
+        req_token = token
+    if not API_TOKEN or req_token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,8 +47,17 @@ def index(request: Request):
     return templates.TemplateResponse(request=request, name="form.html")
 
 @app.post("/messages/submit")
-def submit_form(text: str = Form(...), author: str = Form(...), db: Session = Depends(get_db)):
-    message = models.Message(text=text, author=author)
+def submit_form(text: str = Form(...), author: str = Form(...), image: UploadFile = File(None), db: Session = Depends(get_db)):
+    image_path = None
+    if image and image.filename:
+        filename = f"{uuid.uuid4()}_{image.filename}"
+        os.makedirs("app/static/images", exist_ok=True)
+        filepath = os.path.join("app/static/images", filename)
+        with open(filepath, "wb") as f:
+            f.write(image.file.read())
+        image_path = f"/static/images/{filename}"
+
+    message = models.Message(text=text, author=author, image_path=image_path)
     db.add(message)
     db.commit()
     return RedirectResponse("/", status_code=303)
@@ -46,7 +71,7 @@ def create_message(msg: schemas.MessageCreate, db: Session = Depends(get_db)):
     return message
 
 @app.get("/messages/today/", response_model=dict)
-def messages_today(db: Session = Depends(get_db)):
+def messages_today(db: Session = Depends(get_db), _=Depends(verify_token)):
     today = date.today()
     messages = db.query(models.Message).filter(func.date(models.Message.created_at) == today).all()
     
@@ -79,6 +104,17 @@ def messages_today(db: Session = Depends(get_db)):
         # TRMNL parsea mejor los datetime si son string en Liquid
         if "created_at" in note_dict and isinstance(note_dict["created_at"], datetime):
             note_dict["created_at"] = note_dict["created_at"].strftime('%Y-%m-%d %H:%M')
+            
+        if note_dict.get("image_path"):
+            filepath = "app" + note_dict["image_path"] # /static/...
+            if os.path.exists(filepath):
+                with open(filepath, "rb") as img_file:
+                    encoded_string = base64.b64encode(img_file.read()).decode()
+                    mime_type, _ = mimetypes.guess_type(filepath)
+                    if not mime_type:
+                        mime_type = "image/jpeg"
+                    note_dict["image_base64"] = f"data:{mime_type};base64,{encoded_string}"
+
         notes_data.append(note_dict)
     
     primary_note = notes_data[0] if notes_data else {"text": "No hay mensajes", "author": ""}
@@ -93,13 +129,14 @@ def messages_today(db: Session = Depends(get_db)):
             "notes": notes_data,
             "primary_text": primary_note.get("text", ""),
             "primary_author": primary_note.get("author", ""),
+            "primary_image_base64": primary_note.get("image_base64", ""),
             "secondary_text": secondary_note.get("text", ""),
             "secondary_author": secondary_note.get("author", "")
         }
     }
 
 @app.get("/messages/all/", response_model=dict)
-def get_all_messages(db: Session = Depends(get_db)):
+def get_all_messages(db: Session = Depends(get_db), _=Depends(verify_token)):
     messages = db.query(models.Message).all()
     notes = [schemas.MessageOut.model_validate(m) for m in messages]
     return {"notes": notes}

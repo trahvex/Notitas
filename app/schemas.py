@@ -10,6 +10,7 @@ class MessageOut(BaseModel):
     text: str
     created_at: datetime
     author: str
+    image_path: str | None = None
 
     model_config = {
         "from_attributes": True
